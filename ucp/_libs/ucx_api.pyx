@@ -9,6 +9,7 @@ import functools
 import logging
 import socket
 import weakref
+from time import monotonic as time_monotonic
 
 from posix.stdio cimport open_memstream
 
@@ -644,7 +645,12 @@ cdef class UCXAddress:
         return hash(bytes(self))
 
 
-def _ucx_endpoint_finalizer(uintptr_t handle_as_int, worker, set inflight_msgs):
+def _ucx_endpoint_finalizer(
+    uintptr_t handle_as_int,
+    worker,
+    set inflight_msgs,
+    float timeout=1.0
+):
     assert worker.initialized
     cdef ucp_ep_h handle = <ucp_ep_h>handle_as_int
     cdef ucs_status_ptr_t status
@@ -666,8 +672,11 @@ def _ucx_endpoint_finalizer(uintptr_t handle_as_int, worker, set inflight_msgs):
     cdef str msg
     status = ucp_ep_close_nb(handle, UCP_EP_CLOSE_MODE_FLUSH)
     if UCS_PTR_IS_PTR(status):
+        start = time_monotonic()
         while ucp_request_check_status(status) == UCS_INPROGRESS:
             worker.progress()
+            if time_monotonic() > start + timeout:
+                break
         ucp_request_free(status)
     elif UCS_PTR_STATUS(status) != UCS_OK:
         msg = ucs_status_string(UCS_PTR_STATUS(status)).decode("utf-8")
