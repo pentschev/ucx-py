@@ -45,17 +45,45 @@ def get_ucp_version():
 _am_supported = 1 if (get_ucp_version() >= (1, 11)) else 0
 
 
+def ucx_api_v2_extension(name, extra_sources=[], extra_depends=[]):
+    return Extension(
+        f"ucp._libs.ucx_api_v2.{name}",
+        sources=[f"ucp/_libs/ucx_api_v2/{name}.pyx"] + extra_sources,
+        depends=[
+            f"ucp/_libs/ucx_api_v2/{name}.pxd",
+            "ucp/_libs/ucx_api_v2/ucx_api_dep.pxd",
+        ]
+        + extra_depends,
+        include_dirs=include_dirs,
+        library_dirs=library_dirs,
+        libraries=libraries,
+        extra_compile_args=extra_compile_args,
+    )
+
+
 ext_modules = cythonize(
     [
-        Extension(
-            "ucp._libs.ucx_api",
-            sources=["ucp/_libs/ucx_api.pyx", "ucp/_libs/src/c_util.c"],
-            depends=["ucp/_libs/src/c_util.h", "ucp/_libs/ucx_api_dep.pxd"],
-            include_dirs=include_dirs,
-            library_dirs=library_dirs,
-            libraries=libraries,
-            extra_compile_args=extra_compile_args,
+        ucx_api_v2_extension("packed_remote_key"),
+        ucx_api_v2_extension("transfer"),
+        ucx_api_v2_extension("typedefs"),
+        ucx_api_v2_extension("ucx_address"),
+        ucx_api_v2_extension("ucx_context"),
+        ucx_api_v2_extension("ucx_endpoint"),
+        ucx_api_v2_extension(
+            "ucx_listener",
+            extra_sources=["ucp/_libs/ucx_api_v2/src/c_util.c"],
+            extra_depends=["ucp/_libs/ucx_api_v2/src/c_util.h"],
         ),
+        ucx_api_v2_extension("ucx_memory_handle"),
+        ucx_api_v2_extension("ucx_object"),
+        ucx_api_v2_extension("ucx_request"),
+        ucx_api_v2_extension("ucx_rkey"),
+        ucx_api_v2_extension(
+            "ucx_worker",
+            extra_sources=["ucp/_libs/ucx_api_v2/src/c_util.c"],
+            extra_depends=["ucp/_libs/ucx_api_v2/src/c_util.h"],
+        ),
+        ucx_api_v2_extension("utils"),
         Extension(
             "ucp._libs.arr",
             sources=["ucp/_libs/arr.pyx"],

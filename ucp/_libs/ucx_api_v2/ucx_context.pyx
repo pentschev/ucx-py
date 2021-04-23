@@ -11,7 +11,20 @@ from libc.stdint cimport uintptr_t
 from libc.stdio cimport FILE
 from libc.string cimport memset
 
+from .typedefs cimport ucx_py_request
+
+from .typedefs import Feature
+
 from .ucx_api_dep cimport *
+from .ucx_memory_handle cimport UCXMemoryHandle
+from .utils cimport (
+    _read_ucx_config,
+    assert_ucs_status,
+    create_text_fd,
+    decode_text_fd,
+    ucx_config_to_dict,
+    ucx_py_request_reset,
+)
 
 logger = logging.getLogger("ucx")
 
@@ -30,11 +43,6 @@ cdef class UCXContext(UCXObject):
     feature_flags: Iterable[Feature]
         Tuple of UCX feature flags
     """
-    cdef:
-        ucp_context_h _handle
-        dict _config
-        tuple _feature_flags
-        readonly bint cuda_support
 
     def __init__(
         self,

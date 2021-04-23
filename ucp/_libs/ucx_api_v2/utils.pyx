@@ -18,9 +18,10 @@ from libc.stdio cimport (
 )
 from libc.stdlib cimport free
 
+from .typedefs cimport ucx_py_request
 from .ucx_api_dep cimport *
 
-from ..exceptions import UCXConfigError, UCXError
+from ...exceptions import UCXConfigError, UCXError
 
 
 cdef FILE * create_text_fd():

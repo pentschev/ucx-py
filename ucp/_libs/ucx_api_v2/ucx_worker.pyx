@@ -12,10 +12,19 @@ from libc.stdint cimport uint16_t, uintptr_t
 from libc.stdio cimport FILE
 from libc.string cimport memcpy, memset
 
+from .transfer cimport _send_callback
+from .typedefs import AllocatorType, Feature
 from .ucx_api_dep cimport *
+from .ucx_address cimport UCXAddress
+from .ucx_context cimport UCXContext
+from .ucx_endpoint cimport UCXEndpoint
+from .ucx_object cimport UCXObject
+from .ucx_request cimport UCXRequest, _handle_status
+from .utils cimport assert_ucs_status, create_text_fd, decode_text_fd
+from .utils import is_am_supported
 
-from ..exceptions import UCXCanceled, UCXError, log_errors
-from ..utils import nvtx_annotate
+from ...exceptions import UCXCanceled, UCXError, log_errors
+from ...utils import nvtx_annotate
 
 logger = logging.getLogger("ucx")
 
@@ -273,15 +282,6 @@ IF CY_UCP_AM_SUPPORTED:
 
 cdef class UCXWorker(UCXObject):
     """Python representation of `ucp_worker_h`"""
-    cdef:
-        ucp_worker_h _handle
-        UCXContext _context
-        set _inflight_msgs
-        IF CY_UCP_AM_SUPPORTED:
-            dict _am_recv_pool
-            dict _am_recv_wait
-            object _am_host_allocator
-            object _am_cuda_allocator
 
     def __init__(self, UCXContext context):
         cdef ucp_params_t ucp_params

@@ -10,10 +10,14 @@ import logging
 from libc.stdint cimport uintptr_t
 from libc.stdlib cimport free
 
-from .arr cimport Array
+from ..arr cimport Array
+from .typedefs import Feature
 from .ucx_api_dep cimport *
+from .ucx_endpoint cimport UCXEndpoint
+from .ucx_request cimport UCXRequest, _handle_status
+from .ucx_worker cimport UCXWorker
 
-from ..exceptions import UCXCanceled, UCXError, UCXMsgTruncated, log_errors
+from ...exceptions import UCXCanceled, UCXError, UCXMsgTruncated, log_errors
 
 logger = logging.getLogger("ucx")
 

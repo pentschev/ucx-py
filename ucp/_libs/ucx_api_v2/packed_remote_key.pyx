@@ -7,8 +7,10 @@ from libc.stdint cimport uintptr_t
 from libc.stdlib cimport free
 from libc.string cimport memcpy
 
-from .arr cimport Array
+from ..arr cimport Array
 from .ucx_api_dep cimport *
+from .ucx_memory_handle cimport UCXMemoryHandle
+from .utils cimport assert_ucs_status, get_ucx_object
 
 
 cdef class PackedRemoteKey:
@@ -17,8 +19,6 @@ cdef class PackedRemoteKey:
         should use the from_buffer() and from_mem_handle() class methods or the
         pack_rkey() method on the UCXMemoryHandle class
     """
-    cdef void *_key
-    cdef Py_ssize_t _length
 
     def __cinit__(self, uintptr_t packed_key_as_int, Py_ssize_t length):
         key = <void *> packed_key_as_int

@@ -8,14 +8,14 @@ from libc.stdint cimport uintptr_t
 from libc.stdlib cimport free
 from libc.string cimport memcpy
 
-from .arr cimport Array
+from ..arr cimport Array
 from .ucx_api_dep cimport *
+from .ucx_worker cimport UCXWorker
+from .utils cimport assert_ucs_status, get_ucx_object
 
 
 cdef class UCXAddress:
     """Python representation of ucp_address_t"""
-    cdef ucp_address_t *_address
-    cdef Py_ssize_t _length
 
     def __cinit__(self, uintptr_t address_as_int, Py_ssize_t length):
         address = <ucp_address_t *> address_as_int

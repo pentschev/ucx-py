@@ -6,9 +6,10 @@
 from cpython.ref cimport Py_DECREF, Py_INCREF, PyObject
 from libc.stdint cimport uintptr_t
 
+from .typedefs cimport ucx_py_request
 from .ucx_api_dep cimport *
 
-from ..exceptions import UCXError, UCXMsgTruncated
+from ...exceptions import UCXError, UCXMsgTruncated
 
 
 # Counter used as UCXRequest UIDs
@@ -26,9 +27,6 @@ cdef class UCXRequest:
     Furthermore, UCX can modify/free the UCX handle without notice
     thus we use `_uid` to make sure the handle hasn't been modified.
     """
-    cdef:
-        ucx_py_request *_handle
-        unsigned int _uid
 
     def __init__(self, uintptr_t req_as_int):
         global _ucx_py_request_counter

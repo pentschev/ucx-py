@@ -9,9 +9,13 @@ import logging
 from libc.stdint cimport uintptr_t
 from libc.stdio cimport FILE
 
+from .transfer cimport _send_callback
 from .ucx_api_dep cimport *
+from .ucx_request cimport UCXRequest, _handle_status
+from .ucx_rkey cimport UCXRkey
+from .utils cimport create_text_fd, decode_text_fd
 
-from ..exceptions import UCXError
+from ...exceptions import UCXError
 
 logger = logging.getLogger("ucx")
 
@@ -48,12 +52,6 @@ def _ucx_endpoint_finalizer(uintptr_t handle_as_int, worker, set inflight_msgs):
 
 cdef class UCXEndpoint(UCXObject):
     """Python representation of `ucp_ep_h`"""
-    cdef:
-        ucp_ep_h _handle
-        set _inflight_msgs
-
-    cdef readonly:
-        UCXWorker worker
 
     def __init__(self, UCXWorker worker, uintptr_t handle):
         """The Constructor"""

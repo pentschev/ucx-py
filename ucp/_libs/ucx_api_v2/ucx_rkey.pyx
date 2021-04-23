@@ -5,8 +5,12 @@
 
 from libc.stdint cimport uintptr_t
 
-from .arr cimport Array
+from ..arr cimport Array
+from .packed_remote_key cimport PackedRemoteKey
 from .ucx_api_dep cimport *
+from .ucx_object cimport UCXObject
+from .ucx_endpoint cimport UCXEndpoint
+from .utils cimport assert_ucs_status
 
 
 def _ucx_remote_mem_finalizer_post_flush(req, exception, UCXRkey rkey):
@@ -20,9 +24,6 @@ def _ucx_rkey_finalizer(rkey, ep):
 
 
 cdef class UCXRkey(UCXObject):
-    cdef ucp_rkey_h _handle
-    cdef UCXEndpoint ep
-
     def __init__(self, UCXEndpoint ep, PackedRemoteKey rkey):
         cdef ucs_status_t status
         rkey_arr = Array(rkey)

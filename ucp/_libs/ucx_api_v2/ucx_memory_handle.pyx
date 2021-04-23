@@ -5,8 +5,11 @@
 
 from libc.stdint cimport uintptr_t
 
-from .arr cimport Array
+from ..arr cimport Array
+from .packed_remote_key cimport PackedRemoteKey
 from .ucx_api_dep cimport *
+from .ucx_object cimport UCXObject
+from .utils cimport assert_ucs_status
 
 
 def _ucx_mem_handle_finalizer(uintptr_t handle_as_int, UCXContext ctx):
@@ -21,10 +24,6 @@ cdef class UCXMemoryHandle(UCXObject):
     """ Python representation for ucp_mem_h type. Users should not instance this class
         directly and instead use either the map or the alloc class methods
     """
-    cdef ucp_mem_h _mem_handle
-    cdef UCXContext _context
-    cdef uint64_t r_address
-    cdef size_t _length
 
     def __cinit__(self, UCXContext ctx, uintptr_t par):
         cdef ucs_status_t status

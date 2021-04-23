@@ -21,10 +21,6 @@ cdef class UCXObject:
 
     This base class streamlines the cleanup of UCX objects and reduces duplicate code.
     """
-    cdef:
-        object __weakref__
-        object _finalizer
-        list _children
 
     def __cinit__(self):
         # The finalizer, which can be called multiple times but only

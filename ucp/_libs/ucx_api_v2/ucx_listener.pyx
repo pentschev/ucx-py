@@ -6,8 +6,11 @@
 from libc.stdint cimport uint16_t, uintptr_t
 
 from .ucx_api_dep cimport *
+from .ucx_object cimport UCXObject
+from .ucx_worker cimport UCXWorker
+from .utils cimport assert_ucs_status
 
-from ..exceptions import log_errors
+from ...exceptions import log_errors
 
 
 cdef void _listener_callback(ucp_conn_request_h conn_request, void *args):
@@ -55,14 +58,6 @@ cdef class UCXListener(UCXObject):
     Listener: UCXListener
         The new listener. When this object is deleted, the listening stops
     """
-
-    cdef:
-        ucp_listener_h _handle
-        dict cb_data
-
-    cdef public:
-        uint16_t port
-        str ip
 
     def __init__(
         self,
