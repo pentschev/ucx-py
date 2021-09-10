@@ -31,7 +31,7 @@ if not os.environ.get("UCX_RNDV_THRESH", False):
     os.environ["UCX_RNDV_THRESH"] = "8192"
 
 if not os.environ.get("UCX_RNDV_SCHEME", False):
-    os.environ["UCX_RNDV_SCHEME"] = "get_zcopy"
+    os.environ["UCX_RNDV_SCHEME"] = "put_zcopy"
 
 
 # After handling of environment variable logging, add formatting to the logger
