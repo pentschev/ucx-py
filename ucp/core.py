@@ -165,7 +165,8 @@ async def _listener_handler_coroutine(conn_request, ctx, func, endpoint_error_ha
     )
 
     # Setup the control receive
-    CtrlMsg.setup_ctrl_recv(ep)
+    if endpoint_error_handling is False:
+        CtrlMsg.setup_ctrl_recv(ep)
 
     # Removing references here to avoid delayed clean up
     del ctx
@@ -339,7 +340,8 @@ class ApplicationContext:
         )
 
         # Setup the control receive
-        CtrlMsg.setup_ctrl_recv(ep)
+        if endpoint_error_handling is False:
+            CtrlMsg.setup_ctrl_recv(ep)
         return ep
 
     async def create_endpoint_from_worker_address(
@@ -574,30 +576,36 @@ class Endpoint:
             self.abort()
             return
         try:
-            # Making sure we only tell peer to shutdown once
-            if self._shutting_down_peer:
-                return
-            self._shutting_down_peer = True
+            if self._ep.endpoint_error_handling is False:
+                # Making sure we only tell peer to shutdown once
+                if self._shutting_down_peer:
+                    return
+                self._shutting_down_peer = True
 
-            # Send a shutdown message to the peer
-            msg = CtrlMsg.serialize(opcode=1, close_after_n_recv=self._send_count)
-            msg_arr = Array(msg)
-            log = "[Send shutdown] ep: %s, tag: %s, close_after_n_recv: %d" % (
-                hex(self.uid),
-                hex(self._tags["ctrl_send"]),
-                self._send_count,
-            )
-            logger.debug(log)
-            try:
-                await comm.tag_send(
-                    self._ep, msg_arr, msg_arr.nbytes, self._tags["ctrl_send"], name=log
+                # Send a shutdown message to the peer
+                msg = CtrlMsg.serialize(opcode=1, close_after_n_recv=self._send_count)
+                msg_arr = Array(msg)
+                log = "[Send shutdown] ep: %s, tag: %s, close_after_n_recv: %d" % (
+                    hex(self.uid),
+                    hex(self._tags["ctrl_send"]),
+                    self._send_count,
                 )
-            # The peer might already be shutting down thus we can ignore any send errors
-            except UCXError as e:
-                logging.warning(
-                    "UCX failed closing worker %s (probably already closed): %s"
-                    % (hex(self.uid), repr(e))
-                )
+                logger.debug(log)
+                try:
+                    await comm.tag_send(
+                        self._ep,
+                        msg_arr,
+                        msg_arr.nbytes,
+                        self._tags["ctrl_send"],
+                        name=log,
+                    )
+                # The peer might already be shutting down thus we can ignore any send
+                # errors
+                except UCXError as e:
+                    logging.warning(
+                        "UCX failed closing worker %s (probably already closed): %s"
+                        % (hex(self.uid), repr(e))
+                    )
         finally:
             if not self.closed():
                 # Give all current outstanding send() calls a chance to return

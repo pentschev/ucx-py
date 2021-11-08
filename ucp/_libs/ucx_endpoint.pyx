@@ -319,6 +319,10 @@ cdef class UCXEndpoint(UCXObject):
             raise UCXError(error_msg)
 
     @property
+    def endpoint_error_handling(self):
+        return bool(self._endpoint_error_handling)
+
+    @property
     def handle(self):
         assert self.initialized
         return int(<uintptr_t>self._handle)
