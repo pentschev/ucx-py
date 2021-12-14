@@ -39,6 +39,7 @@ UCX_MAX_RNDV_RAILS=1 UCX_TLS=tcp,cuda_copy,rc python send-recv-core.py \
         --n-iter 100
 """
 import argparse
+import cProfile
 import multiprocessing as mp
 import os
 from threading import Lock
@@ -293,7 +294,12 @@ def client(queue, port, server_address, args):
     if args.cuda_profile:
         xp.cuda.profiler.start()
 
+    if args.cprofile is not None:
+        pr = cProfile.Profile()
+        pr.enable()
+
     times = []
+    total_time = clock()
     for i in range(args.n_iter):
         start = clock()
 
@@ -319,6 +325,12 @@ def client(queue, port, server_address, args):
     if args.delay_progress:
         while finished[0] != 2 * args.n_iter:
             worker.progress()
+
+    total_time = clock() - total_time
+
+    if args.cprofile is not None:
+        pr.disable()
+        pr.dump_stats(args.cprofile)
 
     if args.cuda_profile:
         xp.cuda.profiler.stop()
@@ -356,8 +368,10 @@ def client(queue, port, server_address, args):
         print(f"Device(s)       | {args.server_dev}, {args.client_dev}")
     avg = format_bytes(2 * args.n_iter * args.n_bytes / sum(times))
     med = format_bytes(2 * args.n_bytes / np.median(times))
+    total = format_bytes(2 * args.n_iter * args.n_bytes / total_time)
     print(f"Average         | {avg}/s")
     print(f"Median          | {med}/s")
+    print(f"Total           | {total}/s")
     if not args.no_detailed_report:
         print("--------------------------")
         print("Iterations")
@@ -508,6 +522,12 @@ def parse_args():
         default=False,
         action="store_true",
         help="Disable detailed report per iteration.",
+    )
+    parser.add_argument(
+        "--cprofile",
+        default=None,
+        help="Name of file to dump cProfile stats. Disabled if no file name is "
+        "specified.",
     )
 
     args = parser.parse_args()

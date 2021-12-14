@@ -24,8 +24,11 @@ class ProgressTask(object):
         self.weakref_worker = weakref.ref(worker)
         self.event_loop = event_loop
         self.asyncio_task = None
+        self.stopped = False
 
     def __del__(self):
+        print("Deleting ProgressTask")
+        self.stopped = True
         if self.asyncio_task is not None:
             self.asyncio_task.cancel()
 
@@ -52,6 +55,10 @@ class NonBlockingMode(ProgressTask):
             del worker
             # Give other co-routines a chance to run.
             await asyncio.sleep(0)
+
+
+def _create_task(loop, coro):
+    return loop.create_task(coro)
 
 
 class BlockingMode(ProgressTask):
@@ -82,8 +89,10 @@ class BlockingMode(ProgressTask):
 
         # Notice, we can safely overwrite `self.dangling_arm_task`
         # since previous arm task is finished by now.
-        assert self.asyncio_task is None or self.asyncio_task.done()
-        self.asyncio_task = self.event_loop.create_task(self._arm_worker())
+        # assert self.asyncio_task is None or self.asyncio_task.done()
+        if not self.stopped and (self.asyncio_task is None or self.asyncio_task.done()):
+            # print(f"_fd_reader_callback: {self.stopped}")
+            self.asyncio_task = self.event_loop.create_task(self._arm_worker())
 
     async def _arm_worker(self):
         # When arming the worker, the following must be true:
@@ -91,7 +100,9 @@ class BlockingMode(ProgressTask):
         #  - All asyncio tasks that isn't waiting on UCX must be executed
         #    so that the asyncio's next state is epoll wait.
         #    See <https://github.com/rapidsai/ucx-py/issues/413>
+        # print(f"Arming worker1111111: {self.stopped}")
         while True:
+            # print("Arming worker")
             worker = self.weakref_worker()
             if worker is None or not worker.initialized:
                 return

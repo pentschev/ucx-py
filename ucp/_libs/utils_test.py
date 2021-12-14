@@ -27,7 +27,8 @@ def blocking_flush(obj):
 
 
 def blocking_send(worker, ep, msg, tag=0):
-    msg = Array(msg)
+    if not isinstance(msg, Array):
+        msg = Array(msg)
     finished = [False]
     req = ucx_api.tag_send_nb(
         ep, msg, msg.nbytes, tag=tag, cb_func=blocking_handler, cb_args=(finished,),
@@ -38,7 +39,8 @@ def blocking_send(worker, ep, msg, tag=0):
 
 
 def blocking_recv(worker, ep, msg, tag=0):
-    msg = Array(msg)
+    if not isinstance(msg, Array):
+        msg = Array(msg)
     finished = [False]
     req = ucx_api.tag_recv_nb(
         worker,
@@ -62,7 +64,8 @@ def non_blocking_handler(request, exception, completed_cb):
 
 
 def non_blocking_send(worker, ep, msg, started_cb, completed_cb, tag=0):
-    msg = Array(msg)
+    if not isinstance(msg, Array):
+        msg = Array(msg)
     started_cb()
     req = ucx_api.tag_send_nb(
         ep,
@@ -78,7 +81,8 @@ def non_blocking_send(worker, ep, msg, started_cb, completed_cb, tag=0):
 
 
 def non_blocking_recv(worker, ep, msg, started_cb, completed_cb, tag=0):
-    msg = Array(msg)
+    if not isinstance(msg, Array):
+        msg = Array(msg)
     started_cb()
     req = ucx_api.tag_recv_nb(
         worker,
@@ -95,7 +99,8 @@ def non_blocking_recv(worker, ep, msg, started_cb, completed_cb, tag=0):
 
 
 def blocking_am_send(worker, ep, msg):
-    msg = Array(msg)
+    if not isinstance(msg, Array):
+        msg = Array(msg)
     finished = [False]
     req = ucx_api.am_send_nbx(
         ep, msg, msg.nbytes, cb_func=blocking_handler, cb_args=(finished,),

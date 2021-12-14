@@ -59,6 +59,7 @@ def tag_send_nb(
         Descriptive name of the operation
     """
     ep.raise_on_error()
+    # print(f"tag_send_nb: {cb_func}, {cb_args}, {cb_kwargs}")
     if cb_args is None:
         cb_args = ()
     if cb_kwargs is None:

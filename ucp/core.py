@@ -35,6 +35,13 @@ def _get_ctx():
     return _ctx
 
 
+def _sync_handler(request, exception, ret):
+    if exception is not None:
+        ret[0] = exception
+    else:
+        ret[0] = True
+
+
 async def exchange_peer_info(endpoint, msg_tag, ctrl_tag, listener):
     """Help function that exchange endpoint information"""
 
@@ -214,9 +221,9 @@ class ApplicationContext:
 
         if self.blocking_progress_mode:
             self.epoll_fd = self.worker.init_blocking_progress_mode()
-            weakref.finalize(
-                self, _epoll_fd_finalizer, self.epoll_fd, self.progress_tasks
-            )
+            # weakref.finalize(
+            #     self, _epoll_fd_finalizer, self.epoll_fd, self.progress_tasks
+            # )
 
         # Ensure progress even before Endpoints get created, for example to
         # receive messages directly on a worker after a remote endpoint
@@ -399,14 +406,25 @@ class ApplicationContext:
             `asyncio.get_event_loop()` is used.
         """
         loop = event_loop if event_loop is not None else asyncio.get_event_loop()
-        if loop in self.progress_tasks:
-            return  # Progress has already been guaranteed for the current event loop
+        for progress_task in self.progress_tasks:
+            if loop is progress_task.event_loop:
+                # Progress has already been guaranteed for the current event loop
+                return
+        print(f"Starting continuous UCX progress: {loop}")
 
         if self.blocking_progress_mode:
             task = BlockingMode(self.worker, loop, self.epoll_fd)
         else:
             task = NonBlockingMode(self.worker, loop)
         self.progress_tasks.append(task)
+
+    def stop_continuous_ucx_progress(self):
+        print("Stopping continuous UCX progress")
+        for i in range(len(self.progress_tasks)):
+            print(f"Progress task: {self.progress_tasks[i]}")
+            # del self.progress_tasks[i]
+            self.progress_tasks[i].__del__()
+        self.progress_tasks.clear()
 
     def get_ucp_worker(self):
         """Returns the underlying UCP worker handle (ucp_worker_h)
@@ -615,7 +633,6 @@ class Endpoint:
             The buffer to send. Raise ValueError if buffer is smaller
             than nbytes.
         tag: hashable, optional
-        tag: hashable, optional
             Set a tag that the receiver must match. Currently the tag
             is hashed together with the internal Endpoint tag that is
             agreed with the remote end at connection time. To enforce
@@ -652,6 +669,61 @@ class Endpoint:
             # UCXCanceled exception.
             if self._ep is None:
                 raise e
+
+    @ucx_api.nvtx_annotate("UCXPY_SEND", color="green", domain="ucxpy")
+    async def sync_send(
+        self, buffer, tag=None, force_tag=False, cb_func=None, cb_args=None
+    ):
+        self._ep.raise_on_error()
+        if self.closed():
+            raise UCXCloseError("Endpoint closed")
+        if not isinstance(buffer, Array):
+            buffer = Array(buffer)
+        if tag is None:
+            tag = self._tags["msg_send"]
+        elif not force_tag:
+            tag = hash64bits(self._tags["msg_send"], hash(tag))
+        nbytes = buffer.nbytes
+        # log = "[Send #%03d] ep: %s, tag: %s, nbytes: %d, type: %s" % (
+        #     self._send_count,
+        #     hex(self.uid),
+        #     hex(tag),
+        #     nbytes,
+        #     type(buffer.obj),
+        # )
+        # logger.debug(log)
+        self._send_count += 1
+
+        if cb_func is None:
+            blocking = True
+            ret = [None]
+            cb_func = _sync_handler
+            cb_args = (ret,)
+        else:
+            blocking = False
+            ret = cb_args[0]
+
+        req = ucx_api.tag_send_nb(
+            self._ep, buffer, nbytes, tag=tag, cb_func=cb_func, cb_args=cb_args,
+        )
+
+        if blocking is True:
+            if req is not None:
+                while ret[0] is None:
+                    self._ctx.worker.progress()
+                    await asyncio.sleep(0)
+                if ret[0] is True:
+                    return
+                else:
+                    if isinstance(ret[0], UCXCanceled):
+                        # If self._ep has already been closed and destroyed, we reraise
+                        # the UCXCanceled exception.
+                        if self._ep is None:
+                            raise ret[0]
+                    else:
+                        raise ret[0]
+        else:
+            return req
 
     @ucx_api.nvtx_annotate("UCXPY_AM_SEND", color="green", domain="ucxpy")
     async def am_send(self, buffer):
@@ -730,6 +802,70 @@ class Endpoint:
         ):
             self.abort()
         return ret
+
+    @ucx_api.nvtx_annotate("UCXPY_RECV", color="red", domain="ucxpy")
+    async def sync_recv(
+        self, buffer, tag=None, force_tag=False, cb_func=None, cb_args=None
+    ):
+        if tag is None:
+            tag = self._tags["msg_recv"]
+        elif not force_tag:
+            tag = hash64bits(self._tags["msg_recv"], hash(tag))
+
+        if not self._ctx.worker.tag_probe(tag):
+            self._ep.raise_on_error()
+            if self.closed():
+                raise UCXCloseError("Endpoint closed")
+
+        if not isinstance(buffer, Array):
+            buffer = Array(buffer)
+        nbytes = buffer.nbytes
+        # log = "[Recv #%03d] ep: %s, tag: %s, nbytes: %d, type: %s" % (
+        #     self._recv_count,
+        #     hex(self.uid),
+        #     hex(tag),
+        #     nbytes,
+        #     type(buffer.obj),
+        # )
+        # logger.debug(log)
+        self._recv_count += 1
+
+        if cb_func is None:
+            blocking = True
+            ret = [None]
+            cb_func = _sync_handler
+            cb_args = (ret,)
+        else:
+            blocking = False
+            ret = cb_args[0]
+
+        req = ucx_api.tag_recv_nb(
+            self._ctx.worker,
+            buffer,
+            nbytes,
+            tag=tag,
+            cb_func=cb_func,
+            cb_args=cb_args,
+            ep=self._ep,
+        )
+
+        if blocking is True:
+            if req is not None:
+                while ret[0] is False:
+                    self._ctx.worker.progress()
+                    await asyncio.sleep(0)
+                if ret[0] is True:
+                    self._finished_recv_count += 1
+                    if (
+                        self._close_after_n_recv is not None
+                        and self._finished_recv_count >= self._close_after_n_recv
+                    ):
+                        self.abort()
+                    return buffer
+                else:
+                    raise ret[0]
+        else:
+            return req
 
     @ucx_api.nvtx_annotate("UCXPY_AM_RECV", color="red", domain="ucxpy")
     async def am_recv(self):

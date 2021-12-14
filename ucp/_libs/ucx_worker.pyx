@@ -215,7 +215,7 @@ cdef class UCXWorker(UCXObject):
         assert_ucs_status(status)
         return True
 
-    @nvtx_annotate("UCXPY_PROGRESS", color="blue", domain="ucxpy")
+    # @nvtx_annotate("UCXPY_PROGRESS", color="blue", domain="ucxpy")
     def progress(self):
         """Try to progress the communication layer
 
