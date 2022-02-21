@@ -9,6 +9,7 @@ import logging
 import os
 import re
 import struct
+import threading
 import weakref
 from functools import partial
 from os import close as close_fd
@@ -25,14 +26,29 @@ logger = logging.getLogger("ucx")
 # The module should only instantiate one instance of the application context
 # However, the init of CUDA must happen after all process forks thus we delay
 # the instantiation of the application context to the first use of the API.
-_ctx = None
+_ctxs = {}
+
+
+def _get_ctx_id():
+    if "UCXPY_MT" not in os.environ or os.environ["UCXPY_MT"] == "0":
+        return 0
+    else:
+        return threading.get_ident()
+
+
+def _is_ctx_initialized():
+    global _ctxs
+    return _get_ctx_id() in _ctxs
 
 
 def _get_ctx():
-    global _ctx
-    if _ctx is None:
-        _ctx = ApplicationContext()
-    return _ctx
+    global _ctxs
+
+    ctx_id = _get_ctx_id()
+    print(f"_get_ctx: {ctx_id}")
+    if _is_ctx_initialized() is False:
+        _ctxs[ctx_id] = ApplicationContext()
+    return _ctxs[ctx_id]
 
 
 async def exchange_peer_info(endpoint, msg_tag, ctrl_tag, listener):
@@ -903,8 +919,8 @@ def init(options={}, env_takes_precedence=False, blocking_progress_mode=None):
         `UCXPY_NON_BLOCKING_MODE` is defined.
         Otherwise, if True blocking mode is used and if False non-blocking mode is used.
     """
-    global _ctx
-    if _ctx is not None:
+    global _ctxs
+    if _is_ctx_initialized():
         raise RuntimeError(
             "UCX is already initiated. Call reset() and init() "
             "in order to re-initate UCX with new options."
@@ -914,7 +930,9 @@ def init(options={}, env_takes_precedence=False, blocking_progress_mode=None):
             if k in options:
                 del options[k]
 
-    _ctx = ApplicationContext(options, blocking_progress_mode=blocking_progress_mode)
+    _ctxs[_get_ctx_id()] = ApplicationContext(
+        options, blocking_progress_mode=blocking_progress_mode
+    )
 
 
 def reset():
@@ -922,10 +940,10 @@ def reset():
 
     The library is initiated at next API call.
     """
-    global _ctx
-    if _ctx is not None:
-        weakref_ctx = weakref.ref(_ctx)
-        _ctx = None
+    global _ctxs
+    if _is_ctx_initialized() is True:
+        weakref_ctx = weakref.ref(_get_ctx())
+        del _ctxs[_get_ctx_id()]
         gc.collect()
         if weakref_ctx() is not None:
             msg = (
@@ -973,7 +991,7 @@ def get_config():
         The current UCX configuration options
     """
 
-    if _ctx is None:
+    if _is_ctx_initialized() is False:
         return ucx_api.get_current_options()
     else:
         return _get_ctx().get_config()
@@ -1052,7 +1070,7 @@ async def flush():
        operations issued on this worker have completed both locally and remotely.
        This function does not guarantee ordering.
     """
-    if _ctx is not None:
+    if _is_ctx_initialized() is True:
         return await _get_ctx().flush()
     else:
         # If ctx is not initialized we still want to do the right thing by asyncio
@@ -1064,7 +1082,7 @@ def fence():
        This function returns nothing, but will raise an error if it cannot make
        this guarantee. This function does not ensure any operations have completed.
     """
-    if _ctx is not None:
+    if _is_ctx_initialized() is True:
         _get_ctx().fence()
 
 

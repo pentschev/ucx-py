@@ -254,7 +254,7 @@ cdef extern from "ucp/api/ucp.h":
 
     ucp_tag_message_h ucp_tag_probe_nb(ucp_worker_h worker, ucp_tag_t tag,
                                        ucp_tag_t tag_mask, int remove,
-                                       ucp_tag_recv_info_t *info)
+                                       ucp_tag_recv_info_t *info) nogil
 
     ucs_status_ptr_t ucp_tag_msg_recv_nb(ucp_worker_h worker, void *buffer,
                                          size_t count, ucp_datatype_t datatype,

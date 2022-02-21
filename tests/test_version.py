@@ -6,7 +6,7 @@ def test_get_ucx_version():
     assert isinstance(version, tuple)
     assert len(version) == 3
     # Check UCX isn't initialized
-    assert ucp.core._ctx is None
+    assert ucp.core._is_ctx_initialized() is False
 
 
 def test_version_constant():
